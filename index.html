@@ -1,0 +1,858 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Report Writer">
+    <title>Maintenance Report Writer</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        :root {
+            --bg: #1a1a1a;
+            --surface: #252525;
+            --surface-2: #2f2f2f;
+            --border: #3a3a3a;
+            --text: #e8e8e8;
+            --text-dim: #999;
+            --accent: #f59e0b;
+            --accent-glow: rgba(245, 158, 11, 0.3);
+            --user-bubble: #2d4a2d;
+            --ai-bubble: #2a2a3a;
+            --danger: #ef4444;
+            --success: #22c55e;
+        }
+
+        html, body {
+            height: 100%;
+            overflow: hidden;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            display: flex;
+            flex-direction: column;
+            height: 100dvh;
+        }
+
+        /* ---- HEADER ---- */
+        .header {
+            background: var(--surface);
+            border-bottom: 1px solid var(--border);
+            padding: 16px 20px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-shrink: 0;
+        }
+
+        .header h1 {
+            font-size: 18px;
+            font-weight: 700;
+            color: var(--accent);
+            letter-spacing: 0.5px;
+        }
+
+        .header-actions {
+            display: flex;
+            gap: 8px;
+        }
+
+        .btn-header {
+            background: var(--surface-2);
+            border: 1px solid var(--border);
+            color: var(--text-dim);
+            font-size: 13px;
+            padding: 6px 12px;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .btn-header:active {
+            background: var(--border);
+            color: var(--text);
+        }
+
+        /* ---- CHAT AREA ---- */
+        .chat-container {
+            flex: 1;
+            overflow-y: auto;
+            padding: 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            -webkit-overflow-scrolling: touch;
+            scroll-behavior: smooth;
+        }
+
+        .message {
+            max-width: 85%;
+            padding: 12px 16px;
+            border-radius: 16px;
+            font-size: 16px;
+            line-height: 1.5;
+            animation: fadeIn 0.3s ease;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(8px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .message.ai {
+            background: var(--ai-bubble);
+            align-self: flex-start;
+            border-bottom-left-radius: 4px;
+        }
+
+        .message.user {
+            background: var(--user-bubble);
+            align-self: flex-end;
+            border-bottom-right-radius: 4px;
+        }
+
+        .message.system {
+            background: transparent;
+            align-self: center;
+            color: var(--text-dim);
+            font-size: 14px;
+            text-align: center;
+            padding: 8px;
+        }
+
+        .message.report {
+            background: var(--surface-2);
+            border: 1px solid var(--accent);
+            align-self: stretch;
+            max-width: 100%;
+        }
+
+        .report-text {
+            white-space: pre-wrap;
+            margin-bottom: 12px;
+        }
+
+        .btn-copy {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            width: 100%;
+            padding: 14px;
+            background: var(--accent);
+            color: #000;
+            border: none;
+            border-radius: 10px;
+            font-size: 16px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .btn-copy:active {
+            transform: scale(0.97);
+        }
+
+        .btn-copy.copied {
+            background: var(--success);
+        }
+
+        /* ---- LOADING DOTS ---- */
+        .typing-indicator {
+            display: flex;
+            gap: 4px;
+            padding: 16px;
+            align-self: flex-start;
+        }
+
+        .typing-indicator span {
+            width: 8px;
+            height: 8px;
+            background: var(--text-dim);
+            border-radius: 50%;
+            animation: bounce 1.4s infinite;
+        }
+
+        .typing-indicator span:nth-child(2) { animation-delay: 0.2s; }
+        .typing-indicator span:nth-child(3) { animation-delay: 0.4s; }
+
+        @keyframes bounce {
+            0%, 60%, 100% { transform: translateY(0); }
+            30% { transform: translateY(-8px); }
+        }
+
+        /* ---- INPUT AREA ---- */
+        .input-area {
+            background: var(--surface);
+            border-top: 1px solid var(--border);
+            padding: 12px 16px;
+            padding-bottom: max(12px, env(safe-area-inset-bottom));
+            flex-shrink: 0;
+        }
+
+        .input-row {
+            display: flex;
+            gap: 10px;
+            align-items: flex-end;
+        }
+
+        .text-input-wrapper {
+            flex: 1;
+            position: relative;
+        }
+
+        .text-input {
+            width: 100%;
+            min-height: 44px;
+            max-height: 120px;
+            padding: 10px 14px;
+            background: var(--surface-2);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            color: var(--text);
+            font-size: 16px;
+            font-family: inherit;
+            resize: none;
+            outline: none;
+            line-height: 1.4;
+        }
+
+        .text-input:focus {
+            border-color: var(--accent);
+        }
+
+        .text-input::placeholder {
+            color: var(--text-dim);
+        }
+
+        .btn-send {
+            width: 44px;
+            height: 44px;
+            border-radius: 50%;
+            background: var(--accent);
+            border: none;
+            color: #000;
+            font-size: 20px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+            transition: all 0.2s;
+        }
+
+        .btn-send:disabled {
+            background: var(--border);
+            color: var(--text-dim);
+        }
+
+        .btn-send:active:not(:disabled) {
+            transform: scale(0.9);
+        }
+
+        /* ---- MIC BUTTON ---- */
+        .btn-mic {
+            width: 44px;
+            height: 44px;
+            border-radius: 50%;
+            background: var(--surface-2);
+            border: 2px solid var(--border);
+            color: var(--text);
+            font-size: 22px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+            transition: all 0.2s;
+        }
+
+        .btn-mic.listening {
+            background: var(--danger);
+            border-color: var(--danger);
+            color: white;
+            animation: pulse 1.5s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.4); }
+            50% { box-shadow: 0 0 0 12px rgba(239, 68, 68, 0); }
+        }
+
+        /* ---- SPEAKER BUTTON ---- */
+        .btn-speaker {
+            position: absolute;
+            top: -32px;
+            right: 4px;
+            background: none;
+            border: none;
+            color: var(--text-dim);
+            font-size: 14px;
+            cursor: pointer;
+            padding: 4px 8px;
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .btn-speaker.active {
+            color: var(--accent);
+        }
+
+        /* ---- WELCOME SCREEN ---- */
+        .welcome {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 32px;
+            text-align: center;
+            gap: 16px;
+        }
+
+        .welcome-icon {
+            font-size: 56px;
+            margin-bottom: 8px;
+        }
+
+        .welcome h2 {
+            font-size: 22px;
+            font-weight: 700;
+            color: var(--text);
+        }
+
+        .welcome p {
+            font-size: 16px;
+            color: var(--text-dim);
+            line-height: 1.5;
+            max-width: 300px;
+        }
+
+        .btn-start {
+            margin-top: 16px;
+            padding: 16px 40px;
+            background: var(--accent);
+            color: #000;
+            border: none;
+            border-radius: 12px;
+            font-size: 18px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .btn-start:active {
+            transform: scale(0.95);
+        }
+
+        /* ---- TOAST ---- */
+        .toast {
+            position: fixed;
+            bottom: 100px;
+            left: 50%;
+            transform: translateX(-50%) translateY(20px);
+            background: var(--success);
+            color: #000;
+            padding: 12px 24px;
+            border-radius: 10px;
+            font-size: 15px;
+            font-weight: 600;
+            opacity: 0;
+            transition: all 0.3s;
+            pointer-events: none;
+            z-index: 100;
+        }
+
+        .toast.show {
+            opacity: 1;
+            transform: translateX(-50%) translateY(0);
+        }
+
+        /* ---- UTILITY ---- */
+        .hidden { display: none !important; }
+    </style>
+</head>
+<body>
+
+    <!-- HEADER -->
+    <div class="header">
+        <h1>🔧 Report Writer</h1>
+        <div class="header-actions">
+            <button class="btn-header" id="btnNewReport" onclick="startNewReport()">New Report</button>
+        </div>
+    </div>
+
+    <!-- WELCOME SCREEN -->
+    <div class="welcome" id="welcomeScreen">
+        <div class="welcome-icon">🔧</div>
+        <h2>Maintenance Report Writer</h2>
+        <p>Tap the button below and describe the work you did. I'll write it up for you.</p>
+        <button class="btn-start" onclick="startNewReport()">Start a Report</button>
+    </div>
+
+    <!-- CHAT AREA -->
+    <div class="chat-container hidden" id="chatContainer"></div>
+
+    <!-- INPUT AREA -->
+    <div class="input-area hidden" id="inputArea">
+        <div class="input-row">
+            <button class="btn-mic" id="btnMic" onclick="toggleMic()">🎤</button>
+            <div class="text-input-wrapper">
+                <button class="btn-speaker active" id="btnSpeaker" onclick="toggleSpeaker()">
+                    🔊 Audio On
+                </button>
+                <textarea
+                    class="text-input"
+                    id="textInput"
+                    placeholder="Tap mic or type here..."
+                    rows="1"
+                    oninput="autoResize(this)"
+                    onkeydown="handleKeyDown(event)"
+                ></textarea>
+            </div>
+            <button class="btn-send" id="btnSend" onclick="sendMessage()" disabled>➤</button>
+        </div>
+    </div>
+
+    <!-- TOAST -->
+    <div class="toast" id="toast">Copied to clipboard!</div>
+
+    <script>
+        // ============================================================
+        // CONFIGURATION
+        // ============================================================
+        // IMPORTANT: Change this URL to your Cloudflare Worker URL after deployment
+        const API_PROXY_URL = 'https://restless-sun-46fa.dgalloway.workers.dev';
+
+        // ============================================================
+        // STATE
+        // ============================================================
+        let conversationHistory = [];
+        let isListening = false;
+        let recognition = null;
+        let speakerEnabled = true;
+        let isProcessing = false;
+        let currentSpeech = null;
+
+        const SYSTEM_PROMPT = `You are helping a maintenance technician turn a verbal description of completed work into a clean, professional maintenance log. The tech is using voice-to-text on a phone, so keep all your questions and responses short and easy to read.
+
+Key rules:
+- Ask only ONE question at a time. Never combine multiple questions.
+- Keep your questions short — one sentence max.
+- Be patient with grammar, spelling, and punctuation. They are using talk-to-text. Never correct their input or point out errors.
+- Do not ask for department, employee name, or ID.
+- If the tech gives you most of what you need in their first message, don't re-ask things you already know.
+
+You need four pieces of information:
+1. Machine name — What machine or equipment was worked on?
+2. How the problem was discovered — Who reported it or how did they find out?
+3. Steps taken — What did they actually do?
+4. Current machine status — Is it back in service, down for parts, needs follow-up, etc.?
+
+Skip any items already provided. Once you have all four, write the report.
+
+Write one to two paragraphs in professional, third-person maintenance log tone.
+Example tone: "Upon notification that..." or "It was reported that..."
+NOT: "I went and checked..." or "So basically what happened was..."
+
+Be specific and factual. Do not add details the tech did not provide. Do not include headers, bullet points, or formatting — just clean paragraphs. If the tech mentioned parts, tools, or time spent, include those details naturally.
+
+After writing the report, say exactly this on its own line before the report:
+---REPORT---
+
+And after the report say exactly:
+---END---
+
+Then ask: "Look good, or do you want me to change anything?"
+
+If they want changes, make them and present the updated report using the same ---REPORT--- and ---END--- markers.`;
+
+        // ============================================================
+        // SPEECH RECOGNITION SETUP
+        // ============================================================
+        function setupSpeechRecognition() {
+            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+            if (!SpeechRecognition) {
+                console.warn('Speech recognition not supported');
+                return;
+            }
+
+            recognition = new SpeechRecognition();
+            recognition.continuous = true;
+            recognition.interimResults = true;
+            recognition.lang = 'en-US';
+
+            let finalTranscript = '';
+
+            recognition.onresult = (event) => {
+                let interim = '';
+                for (let i = event.resultIndex; i < event.results.length; i++) {
+                    const transcript = event.results[i][0].transcript;
+                    if (event.results[i].isFinal) {
+                        finalTranscript += transcript + ' ';
+                    } else {
+                        interim = transcript;
+                    }
+                }
+                const input = document.getElementById('textInput');
+                input.value = finalTranscript + interim;
+                autoResize(input);
+                updateSendButton();
+            };
+
+            recognition.onend = () => {
+                if (isListening) {
+                    // Auto-stopped, update UI
+                    stopListening();
+                }
+            };
+
+            recognition.onerror = (event) => {
+                console.error('Speech error:', event.error);
+                if (event.error === 'not-allowed') {
+                    showToast('Microphone access denied');
+                }
+                stopListening();
+            };
+        }
+
+        function toggleMic() {
+            if (isListening) {
+                stopListening();
+            } else {
+                startListening();
+            }
+        }
+
+        function startListening() {
+            if (!recognition) {
+                setupSpeechRecognition();
+                if (!recognition) {
+                    showToast('Voice not supported on this browser');
+                    return;
+                }
+            }
+
+            // Stop any playing speech
+            if (currentSpeech) {
+                window.speechSynthesis.cancel();
+                currentSpeech = null;
+            }
+
+            const input = document.getElementById('textInput');
+            recognition._finalTranscript = input.value;
+
+            // Reset the internal final transcript tracker
+            let existingText = input.value;
+
+            recognition.onresult = (event) => {
+                let finalTranscript = existingText;
+                let interim = '';
+                for (let i = event.resultIndex; i < event.results.length; i++) {
+                    const transcript = event.results[i][0].transcript;
+                    if (event.results[i].isFinal) {
+                        finalTranscript += transcript + ' ';
+                        existingText = finalTranscript;
+                    } else {
+                        interim = transcript;
+                    }
+                }
+                input.value = finalTranscript + interim;
+                autoResize(input);
+                updateSendButton();
+            };
+
+            try {
+                recognition.start();
+                isListening = true;
+                document.getElementById('btnMic').classList.add('listening');
+            } catch (e) {
+                console.error('Failed to start recognition:', e);
+            }
+        }
+
+        function stopListening() {
+            if (recognition) {
+                try { recognition.stop(); } catch(e) {}
+            }
+            isListening = false;
+            document.getElementById('btnMic').classList.remove('listening');
+            updateSendButton();
+        }
+
+        // ============================================================
+        // TEXT-TO-SPEECH
+        // ============================================================
+        function speak(text) {
+            if (!speakerEnabled) return;
+            window.speechSynthesis.cancel();
+
+            const utterance = new SpeechSynthesisUtterance(text);
+            utterance.rate = 0.95;
+            utterance.pitch = 1;
+
+            // Try to pick a good voice
+            const voices = window.speechSynthesis.getVoices();
+            const preferred = voices.find(v =>
+                v.name.includes('Samantha') ||
+                v.name.includes('Karen') ||
+                v.name.includes('Daniel') ||
+                (v.lang.startsWith('en') && v.localService)
+            );
+            if (preferred) utterance.voice = preferred;
+
+            currentSpeech = utterance;
+            utterance.onend = () => { currentSpeech = null; };
+            window.speechSynthesis.speak(utterance);
+        }
+
+        function toggleSpeaker() {
+            speakerEnabled = !speakerEnabled;
+            const btn = document.getElementById('btnSpeaker');
+            if (speakerEnabled) {
+                btn.textContent = '🔊 Audio On';
+                btn.classList.add('active');
+            } else {
+                btn.textContent = '🔇 Audio Off';
+                btn.classList.remove('active');
+                window.speechSynthesis.cancel();
+            }
+        }
+
+        // Load voices
+        window.speechSynthesis.onvoiceschanged = () => {
+            window.speechSynthesis.getVoices();
+        };
+
+        // ============================================================
+        // CHAT FUNCTIONS
+        // ============================================================
+        function startNewReport() {
+            // Stop any speech
+            window.speechSynthesis.cancel();
+
+            conversationHistory = [];
+            document.getElementById('welcomeScreen').classList.add('hidden');
+            document.getElementById('chatContainer').classList.remove('hidden');
+            document.getElementById('inputArea').classList.remove('hidden');
+            document.getElementById('chatContainer').innerHTML = '';
+
+            const greeting = "What machine did you work on?";
+            addMessage(greeting, 'ai');
+            speak(greeting);
+
+            document.getElementById('textInput').focus();
+        }
+
+        function addMessage(text, type) {
+            const container = document.getElementById('chatContainer');
+
+            // Check if this message contains a report
+            if (type === 'ai' && text.includes('---REPORT---')) {
+                const parts = text.split('---REPORT---');
+                const beforeReport = parts[0].trim();
+                const afterParts = parts[1].split('---END---');
+                const reportText = afterParts[0].trim();
+                const afterReport = afterParts.length > 1 ? afterParts[1].trim() : '';
+
+                // Add any text before the report
+                if (beforeReport) {
+                    const preDiv = document.createElement('div');
+                    preDiv.className = 'message ai';
+                    preDiv.textContent = beforeReport;
+                    container.appendChild(preDiv);
+                }
+
+                // Add the report block
+                const reportDiv = document.createElement('div');
+                reportDiv.className = 'message report';
+                reportDiv.innerHTML = `
+                    <div class="report-text">${reportText}</div>
+                    <button class="btn-copy" onclick="copyReport(this, '${escapeForAttr(reportText)}')">
+                        📋 Copy Report to Clipboard
+                    </button>
+                `;
+                container.appendChild(reportDiv);
+
+                // Add any text after the report
+                if (afterReport) {
+                    const postDiv = document.createElement('div');
+                    postDiv.className = 'message ai';
+                    postDiv.textContent = afterReport;
+                    container.appendChild(postDiv);
+                    speak(afterReport);
+                }
+
+                // Speak just a confirmation, not the whole report
+                speak("Your report is ready. You can copy it with the button.");
+
+            } else {
+                const div = document.createElement('div');
+                div.className = `message ${type}`;
+                div.textContent = text;
+                container.appendChild(div);
+
+                if (type === 'ai') {
+                    speak(text);
+                }
+            }
+
+            // Scroll to bottom
+            container.scrollTop = container.scrollHeight;
+        }
+
+        function escapeForAttr(str) {
+            return str.replace(/'/g, "\\'").replace(/"/g, '&quot;').replace(/\n/g, '\\n');
+        }
+
+        function showTyping() {
+            const container = document.getElementById('chatContainer');
+            const div = document.createElement('div');
+            div.className = 'typing-indicator';
+            div.id = 'typingIndicator';
+            div.innerHTML = '<span></span><span></span><span></span>';
+            container.appendChild(div);
+            container.scrollTop = container.scrollHeight;
+        }
+
+        function hideTyping() {
+            const el = document.getElementById('typingIndicator');
+            if (el) el.remove();
+        }
+
+        async function sendMessage() {
+            const input = document.getElementById('textInput');
+            const text = input.value.trim();
+            if (!text || isProcessing) return;
+
+            // Stop listening if active
+            if (isListening) stopListening();
+
+            // Add user message
+            addMessage(text, 'user');
+            conversationHistory.push({ role: 'user', content: text });
+
+            // Clear input
+            input.value = '';
+            autoResize(input);
+            updateSendButton();
+
+            // Show typing
+            isProcessing = true;
+            showTyping();
+
+            try {
+                const response = await fetch(API_PROXY_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        model: 'claude-haiku-4-5-20251001',
+                        max_tokens: 1024,
+                        system: SYSTEM_PROMPT,
+                        messages: conversationHistory
+                    })
+                });
+
+                if (!response.ok) {
+                    throw new Error(`API error: ${response.status}`);
+                }
+
+                const data = await response.json();
+                const aiText = data.content
+                    .filter(block => block.type === 'text')
+                    .map(block => block.text)
+                    .join('\n');
+
+                conversationHistory.push({ role: 'assistant', content: aiText });
+                hideTyping();
+                addMessage(aiText, 'ai');
+
+            } catch (error) {
+                console.error('API Error:', error);
+                hideTyping();
+                addMessage('Something went wrong. Check your connection and try again.', 'system');
+            }
+
+            isProcessing = false;
+        }
+
+        async function copyReport(button, text) {
+            const decoded = text.replace(/\\n/g, '\n').replace(/&quot;/g, '"').replace(/\\'/g, "'");
+            try {
+                await navigator.clipboard.writeText(decoded);
+                button.textContent = '✅ Copied!';
+                button.classList.add('copied');
+                showToast('Copied to clipboard!');
+                setTimeout(() => {
+                    button.textContent = '📋 Copy Report to Clipboard';
+                    button.classList.remove('copied');
+                }, 2000);
+            } catch (e) {
+                // Fallback for older browsers
+                const ta = document.createElement('textarea');
+                ta.value = decoded;
+                ta.style.position = 'fixed';
+                ta.style.opacity = '0';
+                document.body.appendChild(ta);
+                ta.select();
+                document.execCommand('copy');
+                document.body.removeChild(ta);
+                button.textContent = '✅ Copied!';
+                button.classList.add('copied');
+                showToast('Copied to clipboard!');
+                setTimeout(() => {
+                    button.textContent = '📋 Copy Report to Clipboard';
+                    button.classList.remove('copied');
+                }, 2000);
+            }
+        }
+
+        // ============================================================
+        // UI HELPERS
+        // ============================================================
+        function autoResize(el) {
+            el.style.height = 'auto';
+            el.style.height = Math.min(el.scrollHeight, 120) + 'px';
+        }
+
+        function updateSendButton() {
+            const btn = document.getElementById('btnSend');
+            const input = document.getElementById('textInput');
+            btn.disabled = !input.value.trim();
+        }
+
+        function handleKeyDown(e) {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                sendMessage();
+            }
+            updateSendButton();
+        }
+
+        function showToast(msg) {
+            const toast = document.getElementById('toast');
+            toast.textContent = msg;
+            toast.classList.add('show');
+            setTimeout(() => toast.classList.remove('show'), 2000);
+        }
+
+        // Listen for input changes
+        document.getElementById('textInput').addEventListener('input', updateSendButton);
+
+        // Init speech recognition
+        setupSpeechRecognition();
+    </script>
+</body>
+</html>
