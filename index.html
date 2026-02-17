@@ -260,6 +260,34 @@
             transform: scale(0.9);
         }
 
+        /* ---- PLAYBACK BUTTON ---- */
+        .btn-playback {
+            width: 44px;
+            height: 44px;
+            border-radius: 50%;
+            background: var(--surface-2);
+            border: 2px solid var(--border);
+            color: var(--text);
+            font-size: 18px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+            transition: all 0.2s;
+        }
+
+        .btn-playback:active {
+            transform: scale(0.9);
+            background: var(--border);
+        }
+
+        .btn-playback.playing {
+            background: var(--accent);
+            border-color: var(--accent);
+            color: #000;
+        }
+
         /* ---- MIC BUTTON ---- */
         .btn-mic {
             width: 44px;
@@ -422,6 +450,7 @@
                     onkeydown="handleKeyDown(event)"
                 ></textarea>
             </div>
+            <button class="btn-playback" id="btnPlayback" onclick="playbackText()" title="Listen to your message">▶</button>
             <button class="btn-send" id="btnSend" onclick="sendMessage()" disabled>➤</button>
         </div>
     </div>
@@ -629,6 +658,47 @@ If they want changes, make them and present the updated report using the same --
                 btn.classList.remove('active');
                 window.speechSynthesis.cancel();
             }
+        }
+
+        function playbackText() {
+            const input = document.getElementById('textInput');
+            const text = input.value.trim();
+            const btn = document.getElementById('btnPlayback');
+
+            if (!text) return;
+
+            // If already playing, stop it
+            if (btn.classList.contains('playing')) {
+                window.speechSynthesis.cancel();
+                btn.classList.remove('playing');
+                btn.textContent = '▶';
+                return;
+            }
+
+            window.speechSynthesis.cancel();
+
+            const utterance = new SpeechSynthesisUtterance(text);
+            utterance.rate = 0.95;
+            utterance.pitch = 1;
+
+            const voices = window.speechSynthesis.getVoices();
+            const preferred = voices.find(v =>
+                v.name.includes('Samantha') ||
+                v.name.includes('Karen') ||
+                v.name.includes('Daniel') ||
+                (v.lang.startsWith('en') && v.localService)
+            );
+            if (preferred) utterance.voice = preferred;
+
+            btn.classList.add('playing');
+            btn.textContent = '⏹';
+
+            utterance.onend = () => {
+                btn.classList.remove('playing');
+                btn.textContent = '▶';
+            };
+
+            window.speechSynthesis.speak(utterance);
         }
 
         // Load voices
